@@ -131,6 +131,10 @@ pay_junction:
 payment_express:
   login: LOGIN
   password: PASSWORD
+  
+payments_gateway:
+  login: MERCHANT_ID
+  password: PASSWORD
 
 # You can use either your API PEM file or API signature with PayPal.
 paypal_certificate:

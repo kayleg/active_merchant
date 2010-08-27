@@ -51,7 +51,7 @@ module ActiveMerchant #:nodoc:
 
       # Optional verification_value (CVV, CVV2 etc). Gateways will try their best to 
       # run validation on the passed in value if it is supplied
-      attr_accessor :verification_value
+      attr_accessor :verification_value, :track_data
 
       # Provides proxy access to an expiry date object
       def expiry_date
@@ -73,6 +73,10 @@ module ActiveMerchant #:nodoc:
       def last_name?
         !@last_name.blank?
       end
+      
+      def track_data?
+        @track_data.present?
+      end
             
       def name
         "#{@first_name} #{@last_name}"
@@ -80,6 +84,11 @@ module ActiveMerchant #:nodoc:
             
       def verification_value?
         !@verification_value.blank?
+      end
+      
+      def track(track)
+        return "" if track > 2 or not track_data?
+        @track_data.split(/(;.*)/)[track -1]
       end
 
       # Show the card number, with all but last 4 numbers replace with "X". (XXXX-XXXX-XXXX-4338)
