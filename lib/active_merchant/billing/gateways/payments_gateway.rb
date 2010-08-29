@@ -7,7 +7,7 @@ module ActiveMerchant #:nodoc:
       LIVE_PORT = 5050
       
       ACTIONS = { :CC_SALE => 10, :CC_AUTH_ONLY => 11, :CC_CAPTURE => 12, :CC_CREDIT => 13, :CC_VOID => 14,
-                  :CC_PRE_AUTH =>15, :EFT_SALE => 20, :EFT_AUTH_ONLY => 21, :EFT_CAPTRUE => 22, :EFT_CREDIT => 23,
+                  :CC_PRE_AUTH =>15, :EFT_SALE => 20, :EFT_AUTH_ONLY => 21, :EFT_CAPTURE => 22, :EFT_CREDIT => 23,
                   :EFT_VOID => 24, :EFT_FORCE => 25, :EFT_VERIFY_ONLY => 26, :RECUR_SUSPEN => 40,
                   :RECUR_ACTIVATE => 41, :RECUR_DELETE => 42 }
                   
@@ -35,46 +35,70 @@ module ActiveMerchant #:nodoc:
         super
       end  
       
-      def authorize(money, creditcard, options = {})
+      def authorize(money, payment_method, options = {})
         post = []
-        add_invoice(post, options)
-        add_creditcard(post, creditcard)        
-        add_address(post, creditcard, options)        
+        add_invoice(post, options)       
+        add_address(post, payment_method, options)        
         add_customer_data(post, options)
         
-        commit(:CC_AUTH_ONLY, money, post)
+        if payment_method.type == 'check'
+          add_check(post, payment_method)
+          commit(:EFT_AUTH_ONLY, money, post)
+        else
+          add_creditcard(post, payment_method)    
+          commit(:CC_AUTH_ONLY, money, post)
+        end
       end
       
-      def credit(money, creditcard, options = {})
+      def credit(money, payment_method, options = {})
         post = []
-        add_invoice(post, options)
-        add_creditcard(post, creditcard)        
-        add_address(post, creditcard, options)   
+        add_invoice(post, options)      
+        add_address(post, payment_method, options)   
         add_customer_data(post, options)
-        commit(:CC_CREDIT, money, post)
+        
+        if payment_method.type == 'check'
+          add_check(post, payment_method)
+          commit(:EFT_CREDIT, money, post)
+        else
+          add_creditcard(post, payment_method)    
+          commit(:CC_CREDIT, money, post)
+        end
       end
       
-      def purchase(money, creditcard, options = {})
+      def purchase(money, payment_method, options = {})
         post = []
-        add_invoice(post, options)
-        add_creditcard(post, creditcard)        
-        add_address(post, creditcard, options)   
+        add_invoice(post, options)        
+        add_address(post, payment_method, options)   
         add_customer_data(post, options)
              
-        commit(:CC_SALE, money, post)
+        if payment_method.type == 'check'
+          add_check(post, payment_method)
+          commit(:EFT_SALE, money, post)
+        else
+          add_creditcard(post, payment_method)    
+          commit(:CC_SALE, money, post)
+        end
       end                       
     
       def capture(money, authorization, options = {})
-        requires!(options, :trace_number)
+        requires!(options, :trace_number, :payment_type)
         post = ["pg_original_authorization_code=#{authorization}", "pg_original_trace_number=#{options[:trace_number]}"]
-        commit(:CC_CAPTURE, money, post)
+        if options.payment_type == 'check'
+          commit(:EFT_CREDIT, money, post)
+        else  
+          commit(:CC_CREDIT, money, post)
+        end
       end
       
       def void(authorization, options ={})
-        requires!(options, :trace_number)
+        requires!(options, :trace_number, :payment_type)
         post = ["pg_original_authorization_code=#{authorization}", "pg_original_trace_number=#{options[:trace_number]}"]
         
-        commit(:CC_VOID, nil, post)
+        if options.payment_type == 'check'
+          commit(:EFT_CREDIT, money, post)
+        else  
+          commit(:CC_CREDIT, money, post)
+        end
       end
       
       def recurring(money, creditcard, options ={})
@@ -108,15 +132,10 @@ module ActiveMerchant #:nodoc:
       private                       
       
       def add_customer_data(post, options)
-        
       end
 
       def add_address(post, creditcard, options)
-        requires!(options, :billing_address)
-        requires!(options[:billing_address], :name)
-        name = options[:billing_address][:name].split(/\W/);
-        post << "ecom_billto_postal_name_first=#{name[0]}"
-        post << "ecom_billto_postal_name_last=#{name[1]}"      
+              
       end
 
       def add_invoice(post, options)
@@ -126,11 +145,20 @@ module ActiveMerchant #:nodoc:
       def add_creditcard(post, creditcard)
         post << "Ecom_payment_card_type=#{creditcard.type}"
         post << "ecom_payment_card_name=#{creditcard.name}"
+        post << "ecom_billto_postal_name_first=#{creditcard.first_name}"
+        post << "ecom_billto_postal_name_last=#{creditcard.last_name}"
         post << "ecom_payment_card_number=#{creditcard.number}"
         post << "ecom_payment_card_expdate_month=#{creditcard.month}"
         post << "ecom_payment_card_expdate_year=#{creditcard.year}"
         post << "ecom_payment_card_verification=#{creditcard.verification_value}" if creditcard.verification_value?
         post << "pg_cc_swipe_data=#{creditcard.track(1)}" if creditcard.track_data?      
+      end
+      
+      def add_check(post, check)
+        post << "ecom_payment_check_trn=#{check.routing_number}"
+        post << "ecom_payment_check_account=#{check.account_number}"
+        post << "ecom_payment_check_account_type=#{check.account_type}"
+        post << "ecom_payment_check_checkno=#{check.number}"
       end
       
       def parse(body)
