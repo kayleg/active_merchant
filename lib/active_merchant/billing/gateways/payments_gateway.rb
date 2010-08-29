@@ -10,6 +10,9 @@ module ActiveMerchant #:nodoc:
                   :CC_PRE_AUTH =>15, :EFT_SALE => 20, :EFT_AUTH_ONLY => 21, :EFT_CAPTRUE => 22, :EFT_CREDIT => 23,
                   :EFT_VOID => 24, :EFT_FORCE => 25, :EFT_VERIFY_ONLY => 26, :RECUR_SUSPEN => 40,
                   :RECUR_ACTIVATE => 41, :RECUR_DELETE => 42 }
+                  
+      RECURRING_FREQUENCIES = { :weekly => 10, :biweekly => 15, :monthly => 20, :bimonthly => 25,
+                                :quarterly => 30, :semiannually => 35, :yearly => 40 }
       
       # The countries the gateway supports merchants from as 2 digit ISO country codes
       self.supported_countries = ['US']
@@ -62,14 +65,44 @@ module ActiveMerchant #:nodoc:
       end                       
     
       def capture(money, authorization, options = {})
+        requires!(options, :trace_number)
         post = ["pg_original_authorization_code=#{authorization}", "pg_original_trace_number=#{options[:trace_number]}"]
         commit(:CC_CAPTURE, money, post)
       end
       
       def void(authorization, options ={})
+        requires!(options, :trace_number)
         post = ["pg_original_authorization_code=#{authorization}", "pg_original_trace_number=#{options[:trace_number]}"]
         
         commit(:CC_VOID, nil, post)
+      end
+      
+      def recurring(money, creditcard, options ={})
+        requires!(options, :interval, :billing_address)
+        requires!(options[:interval], :length, :frequency)
+        
+        post = []
+        
+        add_invoice(post, options)
+        add_creditcard(post, creditcard)        
+        add_address(post, creditcard, options)   
+        add_customer_data(post, options)
+        
+        post << "pg_schedule_quantity=#{options[:interval][:length]}"
+        post << "pg_schedule_frequency=#{RECURRING_FREQUENCIES[options[:interval][:frequency]]}"
+        post << "pg_schedule_recurring_amount=#{amount(options[:recurring_amount])}" if options.key? :recurring_amount
+        post << "pg_schedule_start_date=#{options[:start_date]}" if options.key? :start_date
+        
+        commit(:CC_SALE, money, post)
+      end
+      
+      def update_recurring(authorization, options)
+        requires!(options, :trace_number, :action)
+        
+        post = []
+        post = ["pg_original_authorization_code=#{authorization}", "pg_original_trace_number=#{options[:trace_number]}"]
+        
+        commit(options[:action], nil, post)
       end
     
       private                       
@@ -79,6 +112,8 @@ module ActiveMerchant #:nodoc:
       end
 
       def add_address(post, creditcard, options)
+        requires!(options, :billing_address)
+        requires!(options[:billing_address], :name)
         name = options[:billing_address][:name].split(/\W/);
         post << "ecom_billto_postal_name_first=#{name[0]}"
         post << "ecom_billto_postal_name_last=#{name[1]}"      
