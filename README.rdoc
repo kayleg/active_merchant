@@ -29,6 +29,7 @@ The {ActiveMerchant Wiki}[http://github.com/Shopify/active_merchant/wikis] conta
 * {NELiX TransaX Gateway}[http://www.nelixtransax.com] - US
 * {NETbilling}[http://www.netbilling.com] - US
 * {PayJunction}[http://www.payjunction.com/] - US
+* {Payments Gateway}[http://www.paymentsgateway.com] -US
 * {PaySecure}[http://www.commsecure.com.au/paysecure.shtml] - AU
 * {PayPal Express Checkout}[https://www.paypal.com/cgi-bin/webscr?cmd=xpt/merchant/ExpressCheckoutIntro-outside] - US, CA, SG, AU
 * {PayPal Payflow Pro}[https://www.paypal.com/cgi-bin/webscr?cmd=_payflow-pro-overview-outside] - US, CA, SG, AU
